@@ -1,0 +1,238 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Wordpress automated installation on EC2 and RDS instances
+
+Metadata:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudformation-interface.html
+  AWS::CloudFormation::Interface:
+    ParameterGroups:      
+      - Label: 
+          default: "Database connection details:"        
+        Parameters:
+          - DatabaseName
+          - DatabaseUser
+          - DatabasePassword
+      - Label:
+          default: "Key Pair to access the EC2Instance:"
+        Parameters:
+          - KeyPair
+Parameters:
+  DatabaseName:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+    Default: wordpressdb
+    Description: The WordPress database name
+    MaxLength: '64'
+    MinLength: '1'
+    Type: String
+  DatabaseUser:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: Must begin with a letter and contain only alphanumeric characters.
+    Default: username
+    Description: Username to connect to the Database
+    MaxLength: '64'
+    MinLength: '1'
+    Type: String
+  DatabasePassword:
+    AllowedPattern: '[a-zA-Z0-9]+'
+    ConstraintDescription: Must contain only alphanumeric characters.
+    Description: The WordPress database admin account password
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+  KeyPair:
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+  # RDS DB Instance Creation
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html
+  WordPressDatabase:
+    Type: AWS::RDS::DBInstance    
+    DeletionPolicy: Delete #Once deleted the database is gone for good. Other options are retain/snapshot   
+    Properties:
+      #Used the function !Join to concatenate the StackName + "database" delimited by "-" (StackName-database) into the Database Identifier
+      DBInstanceIdentifier: !Join
+        - '-'
+        - - !Ref 'AWS::StackName'
+          - 'database'
+      AllocatedStorage: 20
+      DBInstanceClass: db.t2.micro 
+      MultiAZ: false 
+      Engine: mysql
+      MasterUsername: !Ref DatabaseUser  #Using parameter references to be used as input data
+      MasterUserPassword: !Ref DatabasePassword
+      DBName: !Ref DatabaseName
+      PreferredBackupWindow: 05:56-06:26
+      BackupRetentionPeriod: 5      
+      PreferredMaintenanceWindow: mon:03:00-mon:04:00      
+      EngineVersion: 8.0.17
+      AutoMinorVersionUpgrade: true
+      PubliclyAccessible: false
+      StorageType: gp2
+      Port: 3306
+      StorageEncrypted: false
+      CopyTagsToSnapshot: true
+      MonitoringInterval: 0
+      EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights: false
+      DeletionProtection: false
+      DBSubnetGroupName: default
+      DBParameterGroupName: default.mysql8.0
+      OptionGroupName: default:mysql-8-0
+      CACertificateIdentifier: rds-ca-2019      
+      DBSecurityGroups:
+        - !Ref RDSSecurityGroup  
+
+  # EC2 Instance creation    
+  WordPressServer:
+    Type: AWS::EC2::Instance
+    DependsOn: WordPressDatabase
+    # The EC2Instance creation has to be completed before the timeout counter, otherwise it will rollback.
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Metadata:
+      # Handling services and applications to work in the EC2Instance
+      # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.html
+      AWS::CloudFormation::Init:
+        configSets:
+          wordpress-installation:
+            - install-cfn
+            - install-services
+            - prepare-wordpress
+            - configure-wordpress
+            - themesandplugins        
+        install-cfn:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack= ${AWS::StackId}
+                region= ${AWS::Region}
+              group: root
+              mode: 000400
+              owner: root
+          /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+            content: !Sub |
+              [cfn-auto-reloader-hook]
+              triggers=post.update
+              path=Resources.WordPressServer.Metadata.AWS::CloudFormation::Init
+              action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WordPressServer --configSets wordpress-installation --url https://stackbuilder.amazonaws.com
+            group: root
+            mode: 000400
+            owner: root
+        install-services:
+          packages:
+            yum: 
+              httpd24: []
+              php73: []
+              php73-mysqlnd: []
+          services:
+            sysvinit:
+              httpd:
+                enabled: true
+                ensureRunning: true
+        prepare-wordpress:
+          sources:
+            /var/www/html: http://wordpress.org/latest.tar.gz
+          files:
+            #Script to be executed on-call
+            /tmp/wp-config:
+              # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+              content: !Sub 
+                - |
+                  #!/bin/bash -xe                
+                  cp /var/www/html/wordpress/wp-config-sample.php wp-config.php
+                  sed -i.bak "s/'database_name_here'/'${DatabaseName}'/g" wp-config.php
+                  sed -i "s/'username_here'/'${DatabaseUser}'/g" wp-config.php
+                  sed -i "s/'password_here'/'${DatabasePassword}'/g" wp-config.php
+                  sed -i "s/'localhost'/'${DATABASE_HOST}'/g" wp-config.php
+                  echo 'define( 'FS_METHOD', 'direct' );' >> wp-config.php
+                - DATABASE_HOST: !GetAtt WordPressDatabase.Endpoint.Address
+                # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getatt.html
+              group: root              
+              owner: root
+              mode: 000500
+            #Script to be executed on-call
+            /tmp/httpd:
+              content: !Sub |
+                #!/bin/bash -xe
+                sed -i.bak "s|/var/www/html|/var/www/html/wordpress|g" httpd.conf               
+                sed -i '151 s/None/All/' httpd.conf
+              group: root              
+              owner: root
+              mode: 000400            
+            /tmp/permissions:
+              content: !Sub |
+                #!/bin/bash -xe
+                usermod -a -G apache ec2-user
+                chown -R ec2-user:apache /var/www/html/wordpress                
+                chmod 660 /var/www/html/wordpress/wp-config.php
+                find /var/www/html/wordpress -type d -exec chmod 775 {} \;
+                find /var/www/html/wordpress -type f -exec chmod 644 {} \;
+                service httpd restart
+              group: root
+              owner: root
+              mode: 000400
+        configure-wordpress:
+          commands:
+            #Calling scripts in the following order.
+            01-configure-wordpress:
+              command: !Sub |
+                /tmp/wp-config
+              cwd: /var/www/html/wordpress
+            02-configure-httpd:
+              command: !Sub |
+                /tmp/httpd
+              cwd: /etc/httpd/conf
+            03-change-apache-permissions:
+              command: !Sub |
+                /tmp/permissions
+              cwd: "~"
+        themesandplugins:
+            sources:              
+              /var/www/html/wordpress/wp-content/themes: https://downloads.wordpress.org/theme/astra.zip
+              /var/www/html/wordpress/wp-content/plugins: https://github.com/brainstormforce/astra-sites/tarball/master            
+    Properties:            
+      ImageId: ami-0915e09cc7ceee3ab
+      InstanceType: t2.micro #free-tier
+      KeyName: !Ref KeyPair
+      SecurityGroups:
+      - !Ref WordPressSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum update -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource WordPressServer --configsets wordpress-installation --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource WordPressServer --region ${AWS::Region}
+
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+  WordPressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-sg'
+      GroupDescription: Allow HTTP and SSH access through ports 80 and 22 respectively
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 80
+        ToPort: 80
+        IpProtocol: tcp
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        ToPort: 22
+        IpProtocol: tcp
+
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-security-group.html
+  RDSSecurityGroup:
+    Type: AWS::RDS::DBSecurityGroup
+    DependsOn: WordPressSecurityGroup
+    Properties:
+      GroupDescription: Allow access to the RDS DB Instance
+      DBSecurityGroupIngress:
+        #Allowing only objects from the WordPressSecurityGroup to access the database
+        - EC2SecurityGroupId: !GetAtt WordPressSecurityGroup.GroupId
