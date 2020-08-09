@@ -34,3 +34,72 @@ Resources:
       Properties:
           InternetGatewayId: !Ref InternetGateway
           VpcId:             !Ref VPC
+
+#----------------------------------------------------------------------------
+# Subnets
+#----------------------------------------------------------------------------
+  PublicSubnetAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      MapPublicIpOnLaunch: True
+      AvailabilityZone:    !Select [ 0, !GetAZs ]
+      CidrBlock:           !Select [ 0, !Cidr [ !GetAtt VPC.CidrBlock, 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", public, !Select [0, !GetAZs ] ] ]
+          
+  PublicSubnetAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      MapPublicIpOnLaunch: True
+      AvailabilityZone:    !Select [ 1, !GetAZs ]
+      CidrBlock:           !Select [ 1, !Cidr [ !GetAtt VPC.CidrBlock, 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", public, !Select [1, !GetAZs ] ] ]
+
+  PublicSubnetAZ3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      MapPublicIpOnLaunch: True
+      AvailabilityZone:    !Select [ 2, !GetAZs ]
+      CidrBlock:           !Select [ 2, !Cidr [ !GetAtt VPC.CidrBlock, 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", public, !Select [2, !GetAZs ] ] ]
+
+  PrivateSubnetAZ1:
+    DependsOn: PrivateCidr
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      AvailabilityZone:    !Select [ 0, !GetAZs ]
+      CidrBlock:           !Select [ 0, !Cidr [ !Select [ 0, !GetAtt VPC.CidrBlockAssociations ], 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", private, !Select [0, !GetAZs ] ] ]
+
+  PrivateSubnetAZ2:
+    DependsOn: PrivateCidr
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      AvailabilityZone:    !Select [ 1, !GetAZs ]
+      CidrBlock:           !Select [ 1, !Cidr [ !Select [ 0, !GetAtt VPC.CidrBlockAssociations ], 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", private, !Select [1, !GetAZs ] ] ]
+
+  PrivateSubnetAZ3:
+    DependsOn: PrivateCidr
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:               !Ref VPC
+      AvailabilityZone:    !Select [ 2, !GetAZs ]
+      CidrBlock:           !Select [ 2, !Cidr [ !Select [ 0, !GetAtt VPC.CidrBlockAssociations ], 256, 8 ]]
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [ !Ref "AWS::StackName", private, !Select [2, !GetAZs ] ] ]
