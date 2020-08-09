@@ -1,0 +1,30 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+#----------------------------------------------------------------------------
+# VPC
+#----------------------------------------------------------------------------
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:          172.20.0.0/16      
+      EnableDnsHostnames: True
+      EnableDnsSupport:   True
+      InstanceTenancy:    default
+      Tags:
+        - Key:   Name
+          Value: !Join [ -, [!Ref 'AWS::StackName', VPC]]           
+
+  InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags: 
+          - Key:   Name
+            Value: !Join [ -, [!Ref 'AWS::StackName', IGW]]
+  
+  GatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+          InternetGatewayId: !Ref InternetGateway
+          VpcId:             !Ref VPC
