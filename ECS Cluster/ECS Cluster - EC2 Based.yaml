@@ -104,10 +104,31 @@ Resources:
         - Key:   Name
           Value: !Join [ -, [ !Ref "AWS::StackName", private, !Select [2, !GetAZs ] ] ]
 
+#----------------------------------------------------------------------------
+# Route Tables
+#----------------------------------------------------------------------------
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Join [-,[!Ref "AWS::StackName", "Route-Table"]]
+          Value: !Join [-,[!Ref "AWS::StackName", "private-RT"]]
+    
+  PrivateRouteAssociationAZ1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:     !Ref PrivateSubnetAZ1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateRouteAssociationAZ2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:     !Ref PrivateSubnetAZ2
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateRouteAssociationAZ3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:     !Ref PrivateSubnetAZ3
+      RouteTableId: !Ref PrivateRouteTable
