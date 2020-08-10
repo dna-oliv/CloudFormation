@@ -138,8 +138,8 @@ Resources:
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: blablabla
-      GroupName:        blablabla
+      GroupDescription: "Allows HTTP/HTTPS to access the ALB"
+      GroupName:        "HTTP/HTTPS"
       VpcId:            !Ref VPC
       SecurityGroupIngress: 
         - IpProtocol: tcp
@@ -153,3 +153,19 @@ Resources:
       SecurityGroupEgress:
         - CidrIp:  127.0.0.1/32
           IpProtocol: -1
+#----------------------------------------------------------------------------
+# Application Load Balancer
+#----------------------------------------------------------------------------
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Name: !Join [ -, [!Ref 'AWS::StackName', ALB]]
+      Type: application
+      IpAddressType: ipv4      
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref ALBSecurityGroup
+      Subnets: 
+        - !Ref PublicSubnetAZ1
+        - !Ref PublicSubnetAZ2
+        - !Ref PublicSubnetAZ3
