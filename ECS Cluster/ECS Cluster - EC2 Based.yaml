@@ -103,3 +103,11 @@ Resources:
       Tags:
         - Key:   Name
           Value: !Join [ -, [ !Ref "AWS::StackName", private, !Select [2, !GetAZs ] ] ]
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [-,[!Ref "AWS::StackName", "Route-Table"]]
