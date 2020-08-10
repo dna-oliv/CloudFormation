@@ -185,3 +185,21 @@ Resources:
             Path: "/#{path}"
             Query: "#{query}"
             StatusCode: "HTTP_200"
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name:     !Join [ -, [ !Ref 'AWS::StackName', ALB-Target-Group]]
+      Port:     80
+      Protocol: HTTP
+      VpcId:    !Ref VPC
+
+      HealthCheckEnabled:         True
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath:            /healthy.html
+      HealthCheckPort:            80
+      HealthCheckProtocol:        HTTP
+      HealthCheckTimeoutSeconds:  5
+      HealthyThresholdCount:      2
+      Matcher:
+        HttpCode: 200
