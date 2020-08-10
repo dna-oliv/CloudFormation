@@ -169,3 +169,19 @@ Resources:
         - !Ref PublicSubnetAZ1
         - !Ref PublicSubnetAZ2
         - !Ref PublicSubnetAZ3
+
+  ALBlistener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: "redirect"
+          RedirectConfig:
+            Protocol: "HTTP"
+            Port: "80"
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_200"
