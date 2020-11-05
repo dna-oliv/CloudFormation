@@ -84,8 +84,8 @@ Resources:
       DBParameterGroupName: default.mysql8.0
       OptionGroupName: default:mysql-8-0
       CACertificateIdentifier: rds-ca-2019      
-      DBSecurityGroups:
-        - !Ref RDSSecurityGroup  
+      VPCSecurityGroups: 
+        - !GetAtt DatabaseSecurityGroup.GroupId
 
   # EC2 Instance creation    
   WordPressServer:
@@ -226,13 +226,14 @@ Resources:
         FromPort: 22
         ToPort: 22
         IpProtocol: tcp
-
-  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-security-group.html
-  RDSSecurityGroup:
-    Type: AWS::RDS::DBSecurityGroup
-    DependsOn: WordPressSecurityGroup
+  
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow access to the RDS DB Instance
-      DBSecurityGroupIngress:
-        #Allowing only objects from the WordPressSecurityGroup to access the database
-        - EC2SecurityGroupId: !GetAtt WordPressSecurityGroup.GroupId
+      GroupName: !Sub '${AWS::StackName}-db-sg'
+      GroupDescription: Allow EC2 access to Database through ports 3306
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: !GetAtt WordPressSecurityGroup.GroupId
+        FromPort: 3306
+        ToPort: 3306
+        IpProtocol: tcp
