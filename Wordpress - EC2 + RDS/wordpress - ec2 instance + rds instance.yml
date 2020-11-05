@@ -237,3 +237,23 @@ Resources:
         FromPort: 3306
         ToPort: 3306
         IpProtocol: tcp
+
+Outputs:
+  WordPressServerPublicIP:
+    Description: EC2 Public IPV4
+    Value: !GetAtt WordPressServer.PublicIp
+  WordPressServerPrivateIP:
+    Description: EC2 Private IPV4
+    Value: !GetAtt WordPressServer.PrivateIp
+  WordPressServerPublicDNSName:
+    Description: EC2 Public DNS Name
+    Value: !GetAtt WordPressServer.PublicDnsName
+  WordPressServerPrivateDNSName:
+    Description: EC2 Public DNS Name
+    Value: !GetAtt WordPressServer.PrivateDnsName
+  WordPressDatabaseEndPointAddress:
+    Description: RDS database endpoint address
+    Value: !GetAtt WordPressDatabase.Endpoint.Address
+  WordPressDatabaseEndPointPort:
+    Description: RDS database endpoint port
+    Value: !GetAtt WordPressDatabase.Endpoint.Port
