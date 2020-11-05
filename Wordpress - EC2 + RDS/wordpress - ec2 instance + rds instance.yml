@@ -215,7 +215,6 @@ Resources:
   WordPressSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub '${AWS::StackName}-sg'
       GroupDescription: Allow HTTP and SSH access through ports 80 and 22 respectively
       SecurityGroupIngress:
       - CidrIp: 0.0.0.0/0
@@ -230,7 +229,6 @@ Resources:
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub '${AWS::StackName}-db-sg'
       GroupDescription: Allow EC2 access to Database through ports 3306
       SecurityGroupIngress:
       - SourceSecurityGroupId: !GetAtt WordPressSecurityGroup.GroupId
